@@ -7,6 +7,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.persistence.EntityManager;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
@@ -23,5 +25,25 @@ class MemberTest {
         em.persist(teamA);
         em.persist(teamB);
 
+        Member member1 = new Member("멤버1", 10, teamA);
+        Member member2 = new Member("멤버2", 13, teamA);
+        Member member3 = new Member("멤버3", 15, teamB);
+        Member member4 = new Member("멤버4", 20, teamB);
+
+        em.persist(member1);
+        em.persist(member2);
+        em.persist(member3);
+        em.persist(member4);
+
+        //초기화
+        em.flush();
+        em.clear();
+
+        List<Member> members = em.createQuery("select m from Member m", Member.class).getResultList();
+
+        for(Member m:members) {
+            System.out.println("Member = "+m);
+            System.out.println("TEAM = "+m.getTeam().getTeamname());
+        }
     }
 }
