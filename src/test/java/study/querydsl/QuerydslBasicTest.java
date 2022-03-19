@@ -2,6 +2,10 @@ package study.querydsl;
 
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
+import com.querydsl.core.types.Expression;
+import com.querydsl.core.types.dsl.CaseBuilder;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -168,7 +172,8 @@ public class QuerydslBasicTest {
     @Test
     public void groupbyTest() {
 
-        List<Tuple> result = jpaQueryFactory.select(team.teamname, member.age.sum())
+        List<Tuple> result = jpaQueryFactory
+                .select(team.teamname, member.age.sum())
                 .from(member)
                 .join(member.team, team)
                 .groupBy(team.teamname)
@@ -266,4 +271,131 @@ public class QuerydslBasicTest {
                 .fetchOne();
     }
 
+    /**
+     * 서브쿼리
+     * 나이가 가장 많은 회원을 조회
+     */
+    @Test
+    public void subQuery() {
+
+        QMember submember = new QMember("sub");
+
+        List<Member> result = jpaQueryFactory.selectFrom(member)
+                .where(member.age.eq(
+                        JPAExpressions
+                                .select(submember.age.max())
+                                .from(submember)
+                ))
+                .fetch();
+
+        assertThat(result).extracting("age").containsExactly(20);
+    }
+
+    /**
+     * 서브쿼리
+     * 나이가 평균이상인 회원 (goe)
+     */
+    @Test
+    public void subQueryGoe() {
+
+        QMember sub = new QMember("sub");
+        List<Member> result = jpaQueryFactory.selectFrom(member)
+                .where(member.age.goe(
+                        JPAExpressions
+                                .select(sub.age.avg())
+                                .from(sub)
+                )).fetch();
+
+        assertThat(result).extracting("age").containsExactly(15, 20);
+    }
+
+    /**
+     * 서브쿼리 (in)
+     * 멤버나이가 10살 이상인 멤버
+     */
+    @Test
+    public void subqueryIn() {
+
+        QMember sub = new QMember("sub");
+
+        List<Member> result = jpaQueryFactory.selectFrom(member)
+                .where(member.age.in(
+                        JPAExpressions.select(sub.age)
+                                .from(sub)
+                                .where(sub.age.gt(10))
+                )).fetch();
+
+        assertThat(result).extracting("age").containsExactly(13,15,20);
+    }
+
+    /**
+     * 서브쿼리 (항목에 서브쿼리 사용)
+     * 나이의 합을 가져옴
+     */
+    @Test
+    public void columnSubquery() {
+
+        QMember sub = new QMember("sub");
+        jpaQueryFactory.select(member.username,
+                                member.age,
+                                JPAExpressions
+                                .select(sub.age.sum()).from(sub))
+                .from(member)
+                .fetch();
+    }
+
+    /**
+     * case 문 - 단순 case
+     */
+    @Test
+    public void caseTest() {
+        List<String> result = jpaQueryFactory.select(member.age
+                        .when(10).then("열살")
+                        .when(20).then("이십살")
+                        .otherwise("기타"))
+                .from(member)
+                .fetch();
+    }
+
+    /**
+     * case 문 - caseBuilder()
+     */
+    @Test
+    public void caseBuilderTest(){
+        jpaQueryFactory.select(new CaseBuilder()
+                .when(member.age.between(10,19)).then("삽대")
+                .when(member.age.between(20,29)).then("이십대")
+                .otherwise("기타"))
+                .from(member)
+                .fetch();
+    }
+
+    /**
+     * 상수 - Expressions.constant
+     */
+    @Test
+    public void constant() {
+        List<Tuple> result = jpaQueryFactory.select(member.username, Expressions.constant("A"))
+                .from(member)
+                .fetch();
+
+        for(Tuple t:result) {
+            System.out.println("tuple ="+t);
+        }
+    }
+
+    /**
+     * 문자 더하기 - concat
+     * {username}_{age}
+     */
+    @Test
+    public void concat() {
+        List<String> result = jpaQueryFactory.select(member.username
+                        .concat("_")
+                        .concat(member.age.stringValue()))
+                .from(member)
+                .fetch();
+
+        result.forEach(System.out::println);
+    }
 }
