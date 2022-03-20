@@ -1,8 +1,12 @@
 package study.querydsl;
 
+import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Expression;
+import com.querydsl.core.types.Predicate;
+import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.CaseBuilder;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.JPAExpressions;
@@ -11,6 +15,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
+import study.querydsl.dto.MemberDto;
+import study.querydsl.dto.QMemberDto;
+import study.querydsl.dto.userDto;
 import study.querydsl.entity.Member;
 import study.querydsl.entity.QMember;
 import study.querydsl.entity.QTeam;
@@ -20,6 +27,7 @@ import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.PersistenceContext;
 import javax.persistence.PersistenceUnit;
+import javax.persistence.criteria.CriteriaBuilder;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -397,5 +405,185 @@ public class QuerydslBasicTest {
                 .fetch();
 
         result.forEach(System.out::println);
+    }
+
+    /**
+     * 프로젝션 대상이 하나
+     */
+    @Test
+    public void simpleProjection() {
+        List<String> result = jpaQueryFactory.select(member.username)
+                .from(member)
+                .fetch();
+
+        result.forEach(s -> System.out.println("name :"+s));
+
+    }
+
+    /**
+     * 프로젝션 대상이 둘이상 : tuple
+     * usermame, age
+     */
+    @Test
+    public void tupleTest() {
+        List<Tuple> result = jpaQueryFactory.select(member.username, member.age)
+                .from(member)
+                .fetch();
+
+        for(Tuple tuple:result) {
+            String name = tuple.get(member.username);
+            Integer age = tuple.get(member.age);
+            System.out.println("name = " + name + " age = "+age);
+        }
+    }
+
+    /**
+     * JPA - DTO로 반환
+     */
+    @Test
+    public void findDtoJPQL() {
+
+        List<MemberDto> resultList = em.createQuery("select new study.querydsl.dto.MemberDto(m.username, m.age) from Member m", MemberDto.class)
+                .getResultList();
+        resultList.forEach(System.out::println);
+    }
+
+    /**
+     * querydsl - DTO반환 (setter 접근)
+     */
+    @Test
+    public void findDtlQuerydsl() {
+        List<MemberDto> result = jpaQueryFactory.select(Projections.bean(MemberDto.class,
+                        member.username,
+                        member.age))
+                .from(member)
+                .fetch();
+
+        result.forEach(System.out::println);
+    }
+
+    /**
+     * querydsl - DTO반환 (fields 접근)
+     */
+    @Test
+    public void findDtlQuerydslFields() {
+        List<MemberDto> result = jpaQueryFactory.select(Projections.fields(MemberDto.class,
+                        member.username,
+                        member.age))
+                .from(member)
+                .fetch();
+
+        result.forEach(System.out::println);
+    }
+
+    /**
+     * querydsl - DTO 반환(생성자접근방식)
+     */
+    @Test
+    public void findDtlQuerydslConstructor() {
+        List<MemberDto> result = jpaQueryFactory.select(Projections.constructor(MemberDto.class,
+                        member.username,
+                        member.age))
+                .from(member)
+                .fetch();
+
+        result.forEach(System.out::println);
+    }
+
+    /**
+     * querydsl - DTO 반환
+     * DTO 명과 entity 명이 다를경우
+     */
+    @Test
+    public void findDifferntDto() {
+        List<userDto> result = jpaQueryFactory.select(Projections.fields(userDto.class,
+                        member.username.as("name"),
+                        member.age))
+                .from(member)
+                .fetch();
+
+        result.forEach(System.out::println);
+    }
+
+    /**
+     * querydsl - DTO 반환
+     * @QueryProjection 사용
+     */
+    @Test
+    public void queryProjections() {
+        List<MemberDto> result = jpaQueryFactory.select(new QMemberDto(member.username, member.age))
+                .from(member)
+                .fetch();
+
+        result.forEach(System.out::println);
+    }
+
+    /**
+     * 동적쿼리 - booleanBuilder
+     */
+    @Test
+    public void dynamic_booleanBuilder() {
+
+        String nameParam = "멤버1";
+        Integer ageParam = null;
+
+        List<Member> result = searchMember(nameParam, ageParam);
+
+        assertThat(result.size()).isEqualTo(1);
+    }
+
+    private List<Member> searchMember(String nameParam, Integer ageParam) {
+
+        BooleanBuilder build = new BooleanBuilder();
+        if (nameParam != null) {
+            build.and(member.username.eq(nameParam));
+        }
+        if(ageParam != null) {
+            build.and(member.age.eq(ageParam));
+        }
+
+        return jpaQueryFactory.selectFrom(member)
+                .where(build)
+                .fetch();
+    }
+
+    /**
+     * 동적쿼리 - where 다중파라미터
+     */
+    @Test
+    public void dynamic_where() {
+
+        String nameParam = "멤버1";
+        Integer ageParam = null;
+
+        List<Member> result = searchMember1(nameParam, ageParam);
+
+        assertThat(result.size()).isEqualTo(1);
+    }
+
+    private List<Member> searchMember1(String nameParam, Integer ageParam) {
+        return jpaQueryFactory.selectFrom(member)
+                .where(nameEq(nameParam),ageEq(ageParam))
+                .fetch();
+    }
+
+    private BooleanExpression ageEq(Integer ageParam) {
+        return ageParam != null ? member.age.eq(ageParam) : null;
+    }
+
+    private BooleanExpression nameEq(String nameParam) {
+        return nameParam != null ? member.username.eq(nameParam) : null;
+    }
+
+    /**
+     * 수정 - 벌크연산
+     */
+    @Test
+    public void bulkUpdate() {
+
+        long count = jpaQueryFactory.update(member)
+                .set(member.username, "비회원")
+                .where(member.age.lt(20))
+                .execute();
     }
 }
