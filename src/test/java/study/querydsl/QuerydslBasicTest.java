@@ -586,4 +586,23 @@ public class QuerydslBasicTest {
                 .where(member.age.lt(20))
                 .execute();
     }
+
+    /**
+     * 수정 - 벌크연산
+     * 모든 멤버의 연령은 +1 한다.
+     */
+    @Test
+    public void bulkAdd() {
+        long execute = jpaQueryFactory.update(member)
+                .set(member.age, member.age.add(1))
+                .execute();
+
+        em.flush();
+        em.clear();
+
+        List<Member> result = jpaQueryFactory.selectFrom(member)
+                .fetch();
+
+        result.forEach(System.out::println);
+    }
 }
