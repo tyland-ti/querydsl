@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 import study.querydsl.dto.MemberSearchCondition;
 import study.querydsl.dto.MemberTeamDto;
@@ -26,6 +28,9 @@ class MemberJpaRepositoryTest {
 
     @Autowired
     MemberJpaRepository memberJpaRepository;
+
+    @Autowired
+    MemberRepository memberRepository;
 
     @Test
     public void basicTest() {
@@ -88,5 +93,17 @@ class MemberJpaRepositoryTest {
         //where 절 파라미터
         List<MemberTeamDto> search = memberJpaRepository.search(condition2);
         assertThat(result2.size()).isEqualTo(2);
+
+        MemberSearchCondition condition3 = new MemberSearchCondition();
+        PageRequest pageRequest = PageRequest.of(0,3);
+        Page<MemberTeamDto> result3 = memberRepository.searchPageSimple(condition3, pageRequest);
+        assertThat(result3.getSize()).isEqualTo(3);
+        assertThat(result3.getContent()).extracting("username").containsExactly("member1","member2", "member3");
+
+        MemberSearchCondition condition4 = new MemberSearchCondition();
+        PageRequest pageRequest2 = PageRequest.of(0,3);
+        Page<MemberTeamDto> result4 = memberRepository.searchPageComplex(condition4, pageRequest2);
+        assertThat(result3.getSize()).isEqualTo(3);
+        assertThat(result3.getContent()).extracting("username").containsExactly("member1","member2", "member3");
     }
 }
